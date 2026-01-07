@@ -5,11 +5,11 @@ WORKDIR /app
 # 1. Install R PLUS the build tools required to compile node-pty
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+    build-essential \
+    python3 \
     r-base-core \
     r-base-dev \
-    python3 \
-    make \
-    g++ \
+    && ln -s /usr/bin/python3 /usr/bin/python \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Install required R packages 
@@ -24,7 +24,7 @@ COPY package.json pnpm-lock.yaml ./
 # 5. Install node deps (this will now successfully compile node-pty) 
 RUN pnpm install --frozen-lockfile
 
-# 6. Copy the rest of the application [cite: 2]
+# 6. Copy the rest of the application
 COPY . .
 
 # Cloud Run port 
