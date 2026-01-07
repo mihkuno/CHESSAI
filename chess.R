@@ -1646,6 +1646,7 @@ if ("K" %in% score_white[,2]){
     score1<-score_black[score_black[,2]==score_white[check,1],]
     score_black2<-do.call(rbind,list(score_black1,score1))
     if (score_white[check,1] %in% more_white){
+      extra<-numeric()
       checking<-score_white[check,1]
       start<-which(board==checking, arr.ind=TRUE)
       end<-which(board=="K", arr.ind=TRUE)
@@ -1707,7 +1708,12 @@ if ("K" %in% score_white[,2]){
     if (length(shape3)>0){
       for (y in 1:length(shape3)){
         score2<-score_black[score_black[,2]==shape3[y],]
-        score_black2<-do.call(rbind,list(score_black2,score2))}}
+        score_black2<-do.call(rbind,list(score_black2,score2))}
+        extra2<-which(score_black2[,2]==extra,arr.ind = TRUE)
+        ggg<-length(extra2)
+        if (ggg>0){
+          for (gg in 1:ggg){
+            score_black2<-score_black2[-(extra2[gg]-(gg-1)),]}}}
     score_black<-score_black2
     if (length(score_black)==0){respond="Checkmate! You Win!"}}
   if (length(check)>1){
@@ -1846,19 +1852,16 @@ return(respond)}
 
 ## -----------------------------------------------------------------------------
 #play game as white
-# from="D1"
-# to="D6"
-# BM<-black_move(from,to,board)
-# board <- move_piece(board,from,to)
-# board <- move_piece(board,BM[1],BM[2])
-# BM
+#from="D1"
+#to="H5"
+#BM<-black_move(from,to,board)
+#board <- move_piece(board,from,to)
+#board <- move_piece(board,BM[1],BM[2])
+#BM
 
 
 ## -----------------------------------------------------------------------------
 #play game as black
-
-
-
 
 ## -----------------------------------------------------------------------------
 # server.js
@@ -1872,6 +1875,6 @@ play_move <- function(from, to) {
   } else {
     board <<- move_piece(board, from, to)
     board <<- move_piece(board, BM[1], BM[2])
-    cat(toJSON(list(ai_from = BM[1], ai_to = BM[2])))
+    cat(toJSON(list(ai_from = BM[1], ai_to = BM[2], board = board)))
   }
 }
