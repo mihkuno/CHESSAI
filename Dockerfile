@@ -2,26 +2,29 @@ FROM node:24
 
 WORKDIR /app
 
-# Install R + Rscript
+# 1. Install R PLUS build tools for node-pty
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     r-base-core \
     r-base-dev \
+    python3 \
+    make \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Install required R packages
+# 2. Install required R packages
 RUN Rscript -e "install.packages('jsonlite', repos='https://cloud.r-project.org')"
 
-# Install pnpm
+# 3. Install pnpm
 RUN npm install -g pnpm
 
-# Copy dependency files
+# 4. Copy dependency files
 COPY package.json pnpm-lock.yaml ./
 
-# Install node deps
+# 5. Install node deps (this will now compile node-pty correctly)
 RUN pnpm install --frozen-lockfile
 
-# Copy app
+# 6. Copy the rest of the application
 COPY . .
 
 # Cloud Run port
