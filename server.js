@@ -9,7 +9,7 @@ const cookieParser = require('cookie-parser');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
-const port = 8080;
+const port = process.env.PORT || 8080;
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(bodyParser.json());
@@ -261,4 +261,7 @@ app.get('/', (req, res) => {
 });
 
 
-app.listen(port, () => console.log("Resilient server active."));
+
+app.listen(port, "0.0.0.0", () => {
+  console.log(`Resilient server active on port ${port}`);
+});
