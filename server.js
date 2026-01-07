@@ -9,7 +9,7 @@ const cookieParser = require('cookie-parser');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
-const port = 3000;
+const port = 8080;
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(bodyParser.json());
