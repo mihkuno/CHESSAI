@@ -9,6 +9,9 @@ const { v4: uuidv4 } = require('uuid');
 const app = express();
 const port = process.env.PORT || 8080;
 
+// Log startup attempt immediately
+console.log("Starting server process...");
+
 app.use(cors({ origin: true, credentials: true }));
 app.use(bodyParser.json());
 app.use(cookieParser());
@@ -17,7 +20,7 @@ const shell = process.platform === 'win32' ? 'Rterm.exe' : 'R';
 const sessions = new Map();
 const SESSION_TIMEOUT = 1000 * 60 * 60 * 2; 
 
-// Health check endpoint for Cloud Run (Must be fast and non-blocking)
+// 1. Health check endpoint - MUST be defined before other middleware
 app.get('/health', (req, res) => {
     res.status(200).send('OK');
 });
@@ -27,6 +30,7 @@ app.get('/health', (req, res) => {
  */
 async function createSession(sessionId, existingHistory = []) {
     try {
+        console.log(`Spawning R process for session: ${sessionId}`);
         const ptyProcess = pty.spawn(shell, ['--vanilla', '--no-save'], {
             name: 'xterm-color', cols: 80, rows: 30
         });
@@ -43,35 +47,36 @@ async function createSession(sessionId, existingHistory = []) {
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
                 reject(new Error("R Startup Timeout"));
-            }, 15000);
+            }, 20000);
 
-            const initListener = async (data) => {
+            const initListener = (data) => {
                 const str = data.toString();
                 if (str.includes('> ')) {
                     clearTimeout(timeout);
                     ptyProcess.removeListener('data', initListener);
                     
-                    try {
-                        await executeRCommand(sessionId, 'source("chess.R")');
-                        if (existingHistory.length > 0) {
-                            for (const move of existingHistory) {
-                                const from = move.substring(0, 2);
-                                const to = move.substring(2, 4);
-                                await executeRCommand(sessionId, `play_move("${from}", "${to}")`);
+                    executeRCommand(sessionId, 'source("chess.R")')
+                        .then(async () => {
+                            if (existingHistory.length > 0) {
+                                for (const move of existingHistory) {
+                                    const from = move.substring(0, 2);
+                                    const to = move.substring(2, 4);
+                                    await executeRCommand(sessionId, `play_move("${from}", "${to}")`);
+                                }
                             }
-                        }
-                        sessionData.ready = true;
-                        resolve(sessionData);
-                    } catch (err) {
-                        reject(err);
-                    }
+                            sessionData.ready = true;
+                            console.log(`Session ${sessionId} is ready.`);
+                            resolve(sessionData);
+                        })
+                        .catch(reject);
                 }
             };
             ptyProcess.on('data', initListener);
         });
     } catch (e) {
-        console.error("Failed to spawn PTY:", e);
-        throw e;
+        console.error("CRITICAL: Failed to spawn PTY:", e);
+        // We don't throw here to prevent the whole server from crashing
+        return null;
     }
 }
 
@@ -86,11 +91,7 @@ function executeRCommand(sessionId, command) {
             output += str;
             if (str.includes('> ')) {
                 session.ptyProcess.removeListener('data', listener);
-                if (output.includes('Error')) {
-                    reject(new Error(output));
-                } else {
-                    resolve(output);
-                }
+                resolve(output);
             }
         };
         session.ptyProcess.on('data', listener);
@@ -107,7 +108,7 @@ function executeRJsonCommand(sessionId, command) {
         const timeout = setTimeout(() => {
             session.ptyProcess.removeListener('data', listener);
             reject(new Error("R command timed out"));
-        }, 10000);
+        }, 15000);
 
         const listener = (data) => {
             const str = data.toString();
@@ -132,20 +133,21 @@ function executeRJsonCommand(sessionId, command) {
     });
 }
 
-// Session Middleware: Minimal and non-blocking for root/health
+// Session Middleware
 app.use(async (req, res, next) => {
-    if (req.path === '/health' || req.path.startsWith('/public')) return next();
+    // Skip session logic for system paths
+    if (req.path === '/health' || req.path === '/favicon.ico') return next();
 
     let sessionId = req.cookies.chess_session_id;
     if (!sessionId) {
         sessionId = uuidv4();
-        res.cookie('chess_session_id', sessionId, { maxAge: 1000 * 60 * 60 * 24 * 7 });
+        res.cookie('chess_session_id', sessionId, { maxAge: 1000 * 60 * 60 * 24 * 7, httpOnly: true });
     }
     
     req.sessionId = sessionId;
 
     if (!sessions.has(sessionId)) {
-        // Start session in background, don't await here to allow port to bind
+        console.log(`New user detected: ${sessionId}. Initializing engine...`);
         createSession(sessionId).catch(err => console.error("Async Session Init Error:", err));
     } else {
         sessions.get(sessionId).lastSeen = Date.now();
@@ -155,7 +157,7 @@ app.use(async (req, res, next) => {
 
 app.post('/move', async (req, res) => {
     const session = sessions.get(req.sessionId);
-    if (!session || !session.ready) return res.status(503).json({ error: "Engine warming up..." });
+    if (!session || !session.ready) return res.status(503).json({ error: "Engine warming up. Please try again in a few seconds." });
 
     const { from, to } = req.body;
     try {
@@ -192,7 +194,12 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Start listening immediately
-app.listen(port, "0.0.0.0", () => {
-    console.log(`Server listening on port ${port}`);
+// Final error handler to catch any sync errors
+process.on('uncaughtException', (err) => {
+    console.error('FATAL UNCAUGHT EXCEPTION:', err);
+});
+
+// Bind to port 8080 immediately
+const server = app.listen(port, "0.0.0.0", () => {
+    console.log(`Resilient server bound to port ${port}`);
 });

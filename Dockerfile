@@ -1,12 +1,14 @@
-FROM node:20-slim
+FROM node:20-bookworm
 
-# Install R and build dependencies for node-pty
+# Install R and the required system libraries for node-pty
+# 'bookworm' (non-slim) is used here to ensure all shared libs for terminal emulation are present
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     r-base \
     python3 \
     make \
     g++ \
+    libc6-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -17,8 +19,8 @@ RUN npm install -g pnpm
 # Copy dependency files
 COPY package.json pnpm-lock.yaml* ./
 
-# Install node deps (this will now successfully compile node-pty)
-RUN pnpm install
+# Install node deps and force native compilation
+RUN pnpm install --unsafe-perm
 
 # Copy app source
 COPY . .
@@ -26,5 +28,5 @@ COPY . .
 # Cloud Run port
 EXPOSE 8080
 
-# Use standard node to start to ensure clean signal handling
+# Use standard node to start
 CMD ["node", "server.js"]
