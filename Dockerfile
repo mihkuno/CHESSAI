@@ -15,7 +15,7 @@ RUN pnpm install
 COPY . .
 
 # expose port 3000 to the outside world
-EXPOSE 3000
+EXPOSE 8080
 
 # start the application
 CMD ["pnpm", "start"]
