@@ -18,11 +18,15 @@ RUN Rscript -e "install.packages('jsonlite', repos='https://cloud.r-project.org'
 # 3. Install pnpm 
 RUN npm install -g pnpm
 
-# 4. Copy dependency files 
+# 4. Copy dependency files
 COPY package.json pnpm-lock.yaml ./
 
-# 5. Install node deps (this will now successfully compile node-pty) 
+# 5. Install node deps
 RUN pnpm install --frozen-lockfile
+
+# Fix node-pty build issue on Debian/Linux
+RUN sed -i '/-lutil/d' node_modules/node-pty/build/binding.gyp && \
+    pnpm rebuild node-pty
 
 # 6. Copy the rest of the application
 COPY . .
