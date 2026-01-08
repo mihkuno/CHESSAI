@@ -1,4 +1,5 @@
-FROM node:24
+# Use a stable LTS version
+FROM node:22-bookworm
 
 WORKDIR /app
 
@@ -18,17 +19,15 @@ RUN Rscript -e "install.packages('jsonlite', repos='https://cloud.r-project.org'
 # 3. Install pnpm 
 RUN npm install -g pnpm
 
-# 4. Copy dependency files
+# 4. Copy dependency files 
 COPY package.json pnpm-lock.yaml ./
 
-# 5. Install node deps
+# 5. Install node deps 
+# Added --unsafe-perm if needed, though usually not required for pnpm
 RUN pnpm install --frozen-lockfile
 
-# Fix node-pty build issue on Debian/Linux
-RUN sed -i '/-lutil/d' node_modules/node-pty/build/binding.gyp && \
-    pnpm rebuild node-pty
-
 # 6. Copy the rest of the application
+# IMPORTANT: Ensure you have a .dockerignore to avoid overwriting node_modules
 COPY . .
 
 # Cloud Run port 
