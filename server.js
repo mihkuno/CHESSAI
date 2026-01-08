@@ -240,6 +240,11 @@ app.get('/moves', (req, res) => {
     res.json({ movesHistory: session ? session.movesHistory : [] });
 });
 
+// health check
+app.get('/health', (req, res) => {
+    res.send('OK');
+});
+
 setInterval(() => {
     const now = Date.now();
     for (const [id, session] of sessions.entries()) {
